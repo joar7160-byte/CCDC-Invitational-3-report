@@ -48,7 +48,7 @@ Once I realized red team had been in, I started hunting for persistence. Persist
 3. Malicious lines injected into root's `.bashrc` that set up a reverse shell every time someone opened a root terminal.
 4. A hidden SSH authorized_keys file stashed in `/etc/ssh/.ssh/` (a hidden directory red team created) for passwordless access. Throughout the competition, red team was also brute forcing passwords from their IP (10.194.194.85), which I could see in auth.log.
 
-I cleaned all four, then moved to hardening. I patched the SSH config by changing `AuthorizedPrincipalsFile none` to `AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u` and created per user principal files so only certificates with the correct principal could log in as each user. I rotated the root password, set up UFW with only the ports I needed (22, 80, 443, 9000), and configured the Wazuh SIEM agent on kvigindis to report to the manager on gufu. I also SSHed into gufu to check on the Wazuh manager, but the VMs did not have enough resources to do much with it, so I decided to just focus on keeping my SLA uptime on kvigindis. After that, I built a bash audit script and ran it every 10 to 15 minutes for the rest of the competition. 11+ sweeps, all clean. Red team never got back in.
+I cleaned all four, then moved to hardening. I patched the SSH config by changing `AuthorizedPrincipalsFile none` to `AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u` and created per user principal files so only certificates with the correct principal could log in as each user. I rotated the root password, set up UFW with only the ports I needed (22, 80, 443, 9000), and configured the Wazuh SIEM agent on kvigindis to report to the manager on gufu. I also verified the Docker container's PHP config had dangerous functions (exec, system, passthru, shell_exec) disabled to prevent PHP2Shell attacks. I SSHed into gufu to check on the Wazuh manager, but the VMs did not have enough resources to do much with it, so I decided to just focus on keeping my SLA uptime on kvigindis. I also helped a teammate who had an SSHole vulnerability on their Alpine machine by telling them to update their OpenSSH packages. After that, I built a bash audit script and ran it every 10 to 15 minutes for the rest of the competition. 11+ sweeps, all clean. Red team never got back in.
 
 The thing that hurt my score the most was the SSH certificate check. I was the only one on the team whose SSH-CERT scoring was going on and off, so it was likely caused by the missing domain users. A teammate on the AD side confirmed that we were supposed to have 40 domain users but I only had 24 on my box.
 
@@ -58,8 +58,9 @@ The thing that hurt my score the most was the SSH certificate check. I was the o
 - Found `AuthorizedPrincipalsFile none` as the root cause of the compromise.
 - Identified and removed all four persistence mechanisms before red team could use them again.
 - Built a custom audit script during the event and ran it repeatedly to confirm the box stayed clean.
-- Hardened the Docker container: confirmed PHP dangerous functions (exec, system, passthru, shell_exec) were all disabled.
-- Struggled with SSH-CERT scoring due to the CA server password being changed on .231 (AD teammate fixed it) and missing domain users.
+- Hardened the Docker container: confirmed PHP dangerous functions (exec, system, passthru, shell_exec) were all disabled to prevent PHP2Shell attacks.
+- Helped a teammate patch an SSHole vulnerability on their Alpine machine by telling them to update OpenSSH.
+- Struggled with SSH-CERT scoring going on and off, likely due to only having 24 of the expected 40 domain users.
   - Wrote an IR report documenting the full incident with screenshots and evidence for future reference.
 
 ## 4. Lessons Learned
@@ -77,7 +78,7 @@ The thing that hurt my score the most was the SSH certificate check. I was the o
 | Problem | Root cause |
 |---------|------------|
 | Did not catch the SSH config vulnerability immediately | I was not familiar with AuthorizedPrincipalsFile or how SSH certificate authentication works under the hood. The fix was changing `AuthorizedPrincipalsFile none` to `AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u` and creating a file per user in that directory containing their allowed principal name. This meant only certificates issued with the correct principal could log in as that user |
-| SSH-CERT scoring stayed red most of the competition | The CA server's admin password was changed by red team on .231 (fixed by AD teammate), and I only had 24 of the expected 40 domain users |
+| SSH-CERT scoring kept going on and off | I was the only one with this issue, so it was likely caused by only having 24 of the expected 40 domain users on my box |
 | Low uptime score (20%) | Time lost to the initial compromise and the ongoing cert renewal issue |
 | Slow initial response to the compromise | Should have run audit checks immediately at competition start before doing anything else |
 | SSH session kept timing out | Did not set up tmux at the start, so disconnects interrupted my work |
