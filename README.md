@@ -82,7 +82,6 @@ The thing that hurt my score the most was the SSH certificate check. I was the o
 | Low uptime score (20%) | Time lost to the initial compromise and the ongoing cert renewal issue |
 | Slow initial response to the compromise | Should have run audit checks immediately at competition start before doing anything else |
 | SSH session kept timing out | Did not set up tmux at the start, so disconnects interrupted my work |
-| Had to ask for the root password multiple times | No password cheat sheet prepared ahead of time |
 | Was stubborn about documentation | I resisted writing IR reports and injects during the event, but documentation is part of the competition scoring and helps the whole team coordinate |
 
 ## 5. What I'm Working On Next
