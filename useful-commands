@@ -1,0 +1,145 @@
+# Useful Linux Commands from Invitational 3
+
+Commands I used during the competition on kvigindis, Ubuntu 24.04.
+
+## First Things First
+
+```bash
+# Change root password immediately
+passwd root
+
+# Check who is logged in right now
+w
+
+# See recent logins
+last -20
+```
+
+## Recon
+
+```bash
+# List all users with a shell
+getent passwd | grep -v nologin | grep -v /bin/false
+
+# Check for UID 0 accounts besides root
+getent passwd | awk -F: '$3 == 0 {print}'
+
+# See all listening ports and what process owns them
+ss -tlnp
+
+# List running services
+systemctl list-units --type=service --state=running
+
+# Check firewall status
+ufw status verbose
+```
+
+## Hunting Persistence
+
+```bash
+# Check for NOPASSWD sudo access
+grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null
+
+# List all systemd timers
+systemctl list-timers --all
+
+# Check for bashrc backdoors
+grep -n "useradd\|curl\|wget\|nc \|ncat\|bash -i\|/dev/tcp" /root/.bashrc /home/*/.bashrc 2>/dev/null
+
+# Find hidden SSH key backdoors
+find / -name authorized_keys 2>/dev/null
+cat /etc/ssh/.ssh/authorized_keys 2>/dev/null
+
+# Check all crontabs
+for u in $(cut -d: -f1 /etc/passwd); do
+  out=$(crontab -l -u "$u" 2>/dev/null | grep -v "^#" | grep -v "^$")
+  [ -n "$out" ] && echo "$u: $out"
+done
+
+# Recently modified service files in the last 2 hours
+find /etc/systemd/system -name "*.service" -mmin -120 2>/dev/null
+
+# Check for rogue processes
+ps aux | grep -vE "root|www-data|systemd|sshd|nginx|docker|wazuh|ossec|dbus|message|syslog|_apt|chrony|nobody|polkitd"
+```
+
+## Cleaning Persistence
+
+```bash
+# Delete a rogue user and their home directory
+userdel -r svc_health
+
+# Remove NOPASSWD sudoers file
+rm /etc/sudoers.d/svc_health
+
+# Stop and disable a malicious timer/service
+systemctl stop health-check.timer
+systemctl disable health-check.timer
+systemctl stop health-check.service
+systemctl disable health-check.service
+rm /etc/systemd/system/health-check.timer
+rm /etc/systemd/system/health-check.service
+systemctl daemon-reload
+
+# Remove bashrc backdoor lines
+cat /root/.bashrc
+nano /root/.bashrc
+
+# Remove hidden SSH key directory
+rm -rf /etc/ssh/.ssh/
+```
+
+## Hardening
+
+```bash
+# Set up UFW firewall
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 9000/tcp
+ufw enable
+
+# Fix SSH cert auth to prevent cert forgery
+sed -i 's|AuthorizedPrincipalsFile none|AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u|' /etc/ssh/sshd_config
+mkdir -p /etc/ssh/auth_principals
+# Create a principal file per user
+echo "username" > /etc/ssh/auth_principals/username
+systemctl restart sshd
+
+# Check PHP dangerous functions are disabled in a container
+docker exec <container> php -i | grep disable_functions
+
+# Rotate root password
+passwd root
+```
+
+## Monitoring
+
+```bash
+# Watch auth.log for brute force attempts
+grep -E "Accepted|Failed" /var/log/auth.log | grep -v "10.100.111.2" | tail -20
+
+
+# Set up tmux so disconnects don't kill your session
+tmux new -s work
+# Reattach after a disconnect
+tmux attach -t work
+```
+
+## Docker
+
+```bash
+# Check running containers
+docker ps
+
+# Get a shell inside a container
+docker exec -it <container> /bin/bash
+
+# Check container logs
+docker logs <container>
+
+# Restart a container
+docker restart <container>
+```
