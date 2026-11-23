@@ -1,6 +1,6 @@
 # CCDC Invitational 3 Report
 
-November 22, 2026
+November 21, 2026
 
 ## 1. Overview
 
