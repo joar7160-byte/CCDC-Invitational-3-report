@@ -50,7 +50,7 @@ Once I realized red team had been in, I started hunting for persistence. Persist
 
 I cleaned all four, then moved to hardening. I patched the SSH config by changing `AuthorizedPrincipalsFile none` to `AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u` and created per user principal files so only certificates with the correct principal could log in as each user. I rotated the root password, set up UFW with only the ports I needed (22, 80, 443, 9000), and configured the Wazuh SIEM agent on kvigindis to report to the manager on gufu. I also SSHed into gufu to check on the Wazuh manager, but the VMs did not have enough resources to do much with it, so I decided to just focus on keeping my SLA uptime on kvigindis. After that, I built a bash audit script and ran it every 10 to 15 minutes for the rest of the competition. 11+ sweeps, all clean. Red team never got back in.
 
-The thing that hurt my score the most was the SSH certificate check. Red team had changed the Administrator password on the CA server (.231), which broke cert renewals for a while. A teammate on the AD side eventually fixed it and also confirmed that we were supposed to have 40 domain users but I only had 24 on my box, which contributed to the SSH-CERT check failing.
+The thing that hurt my score the most was the SSH certificate check. I was the only one on the team whose SSH-CERT scoring was going on and off, so it was likely caused by the missing domain users. A teammate on the AD side confirmed that we were supposed to have 40 domain users but I only had 24 on my box.
 
 **Key moments from the day**
 
