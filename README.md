@@ -61,7 +61,7 @@ The thing that hurt my score the most was the SSH certificate check. I was the o
 - Hardened the Docker container: confirmed PHP dangerous functions (exec, system, passthru, shell_exec) were all disabled to prevent PHP2Shell attacks.
 - Helped a teammate patch an SSHole vulnerability on their Alpine machine by telling them to update OpenSSH.
 - Struggled with SSH-CERT scoring going on and off, likely due to only having 24 of the expected 40 domain users.
-  - Wrote an IR report documenting the full incident with screenshots and evidence for future reference.
+  - IR report documenting the full incident with screenshots and evidence for future reference.
 
 ## 4. Lessons Learned
 
