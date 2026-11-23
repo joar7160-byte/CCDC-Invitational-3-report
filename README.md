@@ -1,6 +1,6 @@
 # CCDC Invitational 3 Report
 
-November 21, 2026
+November 22, 2026
 
 ## 1. Overview
 
@@ -39,9 +39,7 @@ This was my third CCDC event and the growth from each one was clear. In Invitati
 
 When I connected to kvigindis, I changed the default root credentials right away, then noticed the furniture help site was down. The database credentials in the app were out of sync with the actual MySQL database, so the site couldn't connect. I coordinated with the teammate responsible for the database server to get the MySQL user credentials synced up, and once that was done the site came back online. I also identified the red team IP (10.194.194.85) brute forcing in auth.log and told the router team to block it at the perimeter. I found that the SSH config had a critical misconfiguration. The line `AuthorizedPrincipalsFile none` meant the server would accept any SSH certificate as any user. Red team had already exploited this to get root access.
 
-With the service up, I started taking inventory: checking users, listening ports, running services, and firewall state. I found that the SSH config had a critical misconfiguration that had given red team root access.
-
-Once I realized red team had been in, I started hunting for persistence. Persistence is how attackers stay on a machine even after passwords are changed or sessions are killed. I found four separate backdoors they had planted:
+With the service up, I started taking inventory: checking users, listening ports, running services, and firewall state. Once I realized red team had been in, I started hunting for persistence. Persistence is how attackers stay on a machine even after passwords are changed or sessions are killed. I found four separate backdoors they had planted:
 
 1. A fake service account called `svc_health` with NOPASSWD sudo access, made to look like a legit monitoring user.
 2. A systemd timer called `health-check.timer` with a matching service that ran a malicious script on a loop, calling back to the red team IP (10.194.194.85).
@@ -79,3 +77,7 @@ The thing that hurt my score the most was the SSH certificate check. I was the o
 - Study SSH certificate authentication, AuthorizedPrincipalsFile, and Step CA so I understand the full cert renewal lifecycle before the event.
 - Practice coordinating cross box issues with teammates.
 - Always `cat` suspicious scripts and configs before deleting them so I have evidence for the IR report.
+
+## 6. Useful Commands Reference
+
+See [useful-commands.md](useful-commands.md) for the full list of Linux commands I used during this competition, organized by phase: first login, recon, hunting persistence, cleaning, hardening, monitoring, and Docker.
