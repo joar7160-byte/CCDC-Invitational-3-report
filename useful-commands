@@ -4,75 +4,91 @@ Commands I used during the competition on kvigindis, Ubuntu 24.04.
 
 ## First Things First
 
-```bash
-# Change root password immediately
-passwd root
+Change root password before doing anything else.
 
-# Check who is logged in right now
-w
+`passwd root`
 
-# See recent logins
-last -20
-```
+Check who is currently logged in to the box.
+
+`w`
+
+See the 20 most recent logins to spot anything weird.
+
+`last -20`
 
 ## Recon
 
-```bash
-# List all users with a shell
-getent passwd | grep -v nologin | grep -v /bin/false
+List all users that have a login shell so you can spot rogue accounts.
 
-# Check for UID 0 accounts besides root
-getent passwd | awk -F: '$3 == 0 {print}'
+`getent passwd | grep -v nologin | grep -v /bin/false`
 
-# See all listening ports and what process owns them
-ss -tlnp
+Check if any account besides root has UID 0.
 
-# List running services
-systemctl list-units --type=service --state=running
+`getent passwd | awk -F: '$3 == 0 {print}'`
 
-# Check firewall status
-ufw status verbose
-```
+See all listening ports and which process owns each one.
+
+`ss -tlnp`
+
+List every running service on the box.
+
+`systemctl list-units --type=service --state=running`
+
+Check the current firewall rules.
+
+`ufw status verbose`
 
 ## Hunting Persistence
 
+Check if any user has NOPASSWD sudo access, a common red team move.
+
+`grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null`
+
+List all systemd timers to find anything that shouldn't be there.
+
+`systemctl list-timers --all`
+
+Search bashrc files for common backdoor patterns like reverse shells or user creation.
+
+`grep -n "useradd\|curl\|wget\|nc \|ncat\|bash -i\|/dev/tcp" /root/.bashrc /home/*/.bashrc 2>/dev/null`
+
+Find any authorized_keys files on the system, including hidden ones.
+
 ```bash
-# Check for NOPASSWD sudo access
-grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null
-
-# List all systemd timers
-systemctl list-timers --all
-
-# Check for bashrc backdoors
-grep -n "useradd\|curl\|wget\|nc \|ncat\|bash -i\|/dev/tcp" /root/.bashrc /home/*/.bashrc 2>/dev/null
-
-# Find hidden SSH key backdoors
 find / -name authorized_keys 2>/dev/null
 cat /etc/ssh/.ssh/authorized_keys 2>/dev/null
+```
 
-# Check all crontabs
+Loop through every user and print any crontab entries they have.
+
+```bash
 for u in $(cut -d: -f1 /etc/passwd); do
   out=$(crontab -l -u "$u" 2>/dev/null | grep -v "^#" | grep -v "^$")
   [ -n "$out" ] && echo "$u: $out"
 done
-
-# Recently modified service files in the last 2 hours
-find /etc/systemd/system -name "*.service" -mmin -120 2>/dev/null
-
-# Check for rogue processes
-ps aux | grep -vE "root|www-data|systemd|sshd|nginx|docker|wazuh|ossec|dbus|message|syslog|_apt|chrony|nobody|polkitd"
 ```
+
+Find any service files modified in the last 2 hours.
+
+`find /etc/systemd/system -name "*.service" -mmin -120 2>/dev/null`
+
+List processes not running as expected system users to find rogue ones.
+
+`ps aux | grep -vE "root|www-data|systemd|sshd|nginx|docker|wazuh|ossec|dbus|message|syslog|_apt|chrony|nobody|polkitd"`
 
 ## Cleaning Persistence
 
+Delete a rogue user and their home directory.
+
+`userdel -r svc_health`
+
+Remove their NOPASSWD sudoers file.
+
+`rm /etc/sudoers.d/svc_health`
+
+Stop, disable, and delete a malicious systemd timer and its service, then reload.
+
 ```bash
-# Delete a rogue user and their home directory
-userdel -r svc_health
-
-# Remove NOPASSWD sudoers file
-rm /etc/sudoers.d/svc_health
-
-# Stop and disable a malicious timer/service
 systemctl stop health-check.timer
 systemctl disable health-check.timer
 systemctl stop health-check.service
@@ -80,19 +96,24 @@ systemctl disable health-check.service
 rm /etc/systemd/system/health-check.timer
 rm /etc/systemd/system/health-check.service
 systemctl daemon-reload
+```
 
-# Remove bashrc backdoor lines
+Read the bashrc first to see the backdoor lines, then edit them out.
+
+```bash
 cat /root/.bashrc
 nano /root/.bashrc
-
-# Remove hidden SSH key directory
-rm -rf /etc/ssh/.ssh/
 ```
+
+Remove a hidden SSH key directory red team created.
+
+`rm -rf /etc/ssh/.ssh/`
 
 ## Hardening
 
+Set up UFW to deny everything incoming and only allow the ports you need.
+
 ```bash
-# Set up UFW firewall
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp
@@ -100,46 +121,233 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 9000/tcp
 ufw enable
+```
 
-# Fix SSH cert auth to prevent cert forgery
+Fix SSH cert auth so only certificates with the correct principal can log in as each user.
+
+```bash
 sed -i 's|AuthorizedPrincipalsFile none|AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u|' /etc/ssh/sshd_config
 mkdir -p /etc/ssh/auth_principals
-# Create a principal file per user
 echo "username" > /etc/ssh/auth_principals/username
 systemctl restart sshd
-
-# Check PHP dangerous functions are disabled in a container
-docker exec <container> php -i | grep disable_functions
-
-# Rotate root password
-passwd root
 ```
+
+Check that PHP dangerous functions are disabled inside the Docker container.
+
+`docker exec <container> php -i | grep disable_functions`
+
+Rotate the root password.
+
+`passwd root`
 
 ## Monitoring
 
-```bash
-# Watch auth.log for brute force attempts
-grep -E "Accepted|Failed" /var/log/auth.log | grep -v "10.100.111.2" | tail -20
+Check auth.log for accepted and failed logins, filtering out the scoring engine.
 
+`grep -E "Accepted|Failed" /var/log/auth.log | grep -v "10.100.111.2" | tail -20`
 
-# Set up tmux so disconnects don't kill your session
-tmux new -s work
-# Reattach after a disconnect
-tmux attach -t work
-```
+Check if the Wazuh agent is running.
+
+`systemctl status wazuh-agent`
+
+Start a tmux session so SSH disconnects don't kill your work.
+
+`tmux new -s work`
+
+Reattach to your tmux session after a disconnect.
+
+`tmux attach -t work`
 
 ## Docker
 
+List running containers.
+
+`docker ps`
+
+Get a shell inside a container.
+
+`docker exec -it <container> /bin/bash`
+
+Check container logs.
+
+`docker logs <container>`
+
+Restart a container.
+
+`docker restart <container>`# Useful Linux Commands from Invitational 3
+
+Commands I used during the competition on kvigindis, Ubuntu 24.04.
+
+## First Things First
+
+Change root password before doing anything else.
+
+`passwd root`
+
+Check who is currently logged in to the box.
+
+`w`
+
+See the 20 most recent logins to spot anything weird.
+
+`last -20`
+
+## Recon
+
+List all users that have a login shell so you can spot rogue accounts.
+
+`getent passwd | grep -v nologin | grep -v /bin/false`
+
+Check if any account besides root has UID 0.
+
+`getent passwd | awk -F: '$3 == 0 {print}'`
+
+See all listening ports and which process owns each one.
+
+`ss -tlnp`
+
+List every running service on the box.
+
+`systemctl list-units --type=service --state=running`
+
+Check the current firewall rules.
+
+`ufw status verbose`
+
+## Hunting Persistence
+
+Check if any user has NOPASSWD sudo access, a common red team move.
+
+`grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null`
+
+List all systemd timers to find anything that shouldn't be there.
+
+`systemctl list-timers --all`
+
+Search bashrc files for common backdoor patterns like reverse shells or user creation.
+
+`grep -n "useradd\|curl\|wget\|nc \|ncat\|bash -i\|/dev/tcp" /root/.bashrc /home/*/.bashrc 2>/dev/null`
+
+Find any authorized_keys files on the system, including hidden ones.
+
 ```bash
-# Check running containers
-docker ps
-
-# Get a shell inside a container
-docker exec -it <container> /bin/bash
-
-# Check container logs
-docker logs <container>
-
-# Restart a container
-docker restart <container>
+find / -name authorized_keys 2>/dev/null
+cat /etc/ssh/.ssh/authorized_keys 2>/dev/null
 ```
+
+Loop through every user and print any crontab entries they have.
+
+```bash
+for u in $(cut -d: -f1 /etc/passwd); do
+  out=$(crontab -l -u "$u" 2>/dev/null | grep -v "^#" | grep -v "^$")
+  [ -n "$out" ] && echo "$u: $out"
+done
+```
+
+Find any service files modified in the last 2 hours.
+
+`find /etc/systemd/system -name "*.service" -mmin -120 2>/dev/null`
+
+List processes not running as expected system users to find rogue ones.
+
+`ps aux | grep -vE "root|www-data|systemd|sshd|nginx|docker|wazuh|ossec|dbus|message|syslog|_apt|chrony|nobody|polkitd"`
+
+## Cleaning Persistence
+
+Delete a rogue user and their home directory.
+
+`userdel -r svc_health`
+
+Remove their NOPASSWD sudoers file.
+
+`rm /etc/sudoers.d/svc_health`
+
+Stop, disable, and delete a malicious systemd timer and its service, then reload.
+
+```bash
+systemctl stop health-check.timer
+systemctl disable health-check.timer
+systemctl stop health-check.service
+systemctl disable health-check.service
+rm /etc/systemd/system/health-check.timer
+rm /etc/systemd/system/health-check.service
+systemctl daemon-reload
+```
+
+Read the bashrc first to see the backdoor lines, then edit them out.
+
+```bash
+cat /root/.bashrc
+nano /root/.bashrc
+```
+
+Remove a hidden SSH key directory red team created.
+
+`rm -rf /etc/ssh/.ssh/`
+
+## Hardening
+
+Set up UFW to deny everything incoming and only allow the ports you need.
+
+```bash
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 9000/tcp
+ufw enable
+```
+
+Fix SSH cert auth so only certificates with the correct principal can log in as each user.
+
+```bash
+sed -i 's|AuthorizedPrincipalsFile none|AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u|' /etc/ssh/sshd_config
+mkdir -p /etc/ssh/auth_principals
+echo "username" > /etc/ssh/auth_principals/username
+systemctl restart sshd
+```
+
+Check that PHP dangerous functions are disabled inside the Docker container.
+
+`docker exec <container> php -i | grep disable_functions`
+
+Rotate the root password.
+
+`passwd root`
+
+## Monitoring
+
+Check auth.log for accepted and failed logins, filtering out the scoring engine.
+
+`grep -E "Accepted|Failed" /var/log/auth.log | grep -v "10.100.111.2" | tail -20`
+
+Check if the Wazuh agent is running.
+
+`systemctl status wazuh-agent`
+
+Start a tmux session so SSH disconnects don't kill your work.
+
+`tmux new -s work`
+
+Reattach to your tmux session after a disconnect.
+
+`tmux attach -t work`
+
+## Docker
+
+List running containers.
+
+`docker ps`
+
+Get a shell inside a container.
+
+`docker exec -it <container> /bin/bash`
+
+Check container logs.
+
+`docker logs <container>`
+
+Restart a container.
+
+`docker restart <container>`
