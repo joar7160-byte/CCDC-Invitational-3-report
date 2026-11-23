@@ -52,55 +52,30 @@ I cleaned all four, then moved to hardening. I patched the SSH config by changin
 
 The thing that hurt my score the most was the SSH certificate check. I was the only one on the team whose SSH-CERT scoring was going on and off, so it was likely caused by the missing domain users. A teammate on the AD side confirmed that we were supposed to have 40 domain users but I only had 24 on my box.
 
-**Key moments from the day**
-
-- Ran inventory on kvigindis immediately after connecting: users, ports, services, SSH config.
-- Found `AuthorizedPrincipalsFile none` as the root cause of the compromise.
-- Identified and removed all four persistence mechanisms before red team could use them again.
-- Built a custom audit script during the event and ran it repeatedly to confirm the box stayed clean.
-- Hardened the Docker container: confirmed PHP dangerous functions (exec, system, passthru, shell_exec) were all disabled to prevent PHP2Shell attacks.
-- Helped a teammate patch an SSHole vulnerability on their Alpine machine by telling them to update OpenSSH.
-- Struggled with SSH-CERT scoring going on and off, likely due to only having 24 of the expected 40 domain users.
-  - IR report documenting the full incident with screenshots and evidence for future reference.
-
 ## 4. Lessons Learned
 
 **What went well**
 
-- I found and cleaned all four persistence mechanisms before red team could reestablish access.
-- I identified the root cause (AuthorizedPrincipalsFile none) and patched it correctly with per user principal files.
-- I built an audit script during the event and ran it consistently, confirming 11+ clean sweeps with no reinfection.
-- I hardened the firewall to only the ports I needed and verified the Docker container's PHP config was locked down.
-- Compared to Invitational 1, I was much more independent and methodical. I checked one thing at a time instead of guessing.
+- Found and cleaned all four persistence mechanisms before red team could reestablish access. 11+ audit sweeps after, all clean.
+- Identified the root cause (`AuthorizedPrincipalsFile none`) and patched it correctly with per user principal files.
+- Changed default creds immediately, flagged the red team IP to the router team, locked down PHP dangerous functions, and hardened the firewall on my own.
+- Helped a teammate patch SSHole on their Alpine box.
+- Compared to Invitational 1, I was much more independent and methodical.
 
-**What went wrong and why**
+**What I need to fix**
 
-| Problem | Root cause |
-|---------|------------|
-| Did not catch the SSH config vulnerability immediately | I was not familiar with AuthorizedPrincipalsFile or how SSH certificate authentication works under the hood. The fix was changing `AuthorizedPrincipalsFile none` to `AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u` and creating a file per user in that directory containing their allowed principal name. This meant only certificates issued with the correct principal could log in as that user |
-| SSH-CERT scoring kept going on and off | I was the only one with this issue, so it was likely caused by only having 24 of the expected 40 domain users on my box |
-| Low uptime score (20%) | Time lost to the initial compromise and the ongoing cert renewal issue |
-| Slow initial response to the compromise | Should have run audit checks immediately at competition start before doing anything else |
-| SSH session kept timing out | Did not set up tmux at the start, so disconnects interrupted my work |
-| Was stubborn about documentation | I resisted writing IR reports and injects during the event, but documentation is part of the competition scoring and helps the whole team coordinate |
+| Problem | Root cause | Fix for next time |
+|---------|------------|-------------------|
+| Did not catch the SSH config vulnerability immediately | Not familiar with AuthorizedPrincipalsFile or SSH cert auth internals | Study SSH certificate authentication and Step CA before the event |
+| SSH-CERT scoring kept going on and off | Likely caused by only having 24 of the expected 40 domain users | Verify expected user counts early and flag mismatches immediately |
+| Low uptime score (20%) | Time lost to the initial compromise and ongoing cert issue | Run audit checks first thing at competition start |
+| SSH session kept timing out | Did not set up tmux at the start | Set up tmux immediately after connecting |
+| Was stubborn about documentation | Resisted writing IR reports and injects during the event | Put real effort into documentation. It is worth points and helps the team |
 
 ## 5. What I'm Working On Next
 
-**Before the next competition**
-
 - Write and test a Linux audit script ahead of time so it is ready to drop on any box in the first 5 minutes. Include checks for users, sudoers, crontabs, systemd timers, bashrc backdoors, SSH keys, and recently modified services.
-- Write a Windows audit script in PowerShell covering local admins, scheduled tasks, new services, recent logon events, firewall rules, and startup programs.
-- Build a first 5 minutes script that changes the root/admin password, runs the full audit, enables the firewall, sets up tmux, and installs the Wazuh agent.
-- Build a continuous monitor script that watches /etc/passwd, /etc/sudoers.d/, systemd, and auth.log in the background via tmux.
+- Build scripts for the first 5 minutes that changes the root/admin password, runs the full audit, enables the firewall, sets up tmux, and installs the Wazuh agent.
 - Study SSH certificate authentication, AuthorizedPrincipalsFile, and Step CA so I understand the full cert renewal lifecycle before the event.
-- Practice coordinating cross box issues with teammates so handoffs on shared infrastructure (like a CA server) are faster.
-
-**Habits to change**
-
-- Run audit checks first, before anything else, at competition start.
-- Set up tmux immediately after connecting so SSH disconnects do not interrupt work.
-- Keep a password cheat sheet ready so I do not waste time asking for credentials.
+- Practice coordinating cross box issues with teammates.
 - Always `cat` suspicious scripts and configs before deleting them so I have evidence for the IR report.
-- Verify expected user counts early. If the box should have 40 users and I only see 24, flag it immediately.
-- Ask the router team to block known red team IPs at the perimeter as soon as they are identified.
-- Put real effort into documentation, IR reports, and injects. They are worth points and help the team.
