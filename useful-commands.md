@@ -11,10 +11,14 @@ Change root password before doing anything else.
 passwd root
 ```
 
+&nbsp;
+
 Check who is currently logged in to the box.
 ```
 w
 ```
+
+&nbsp;
 
 See the 20 most recent logins to spot anything weird.
 ```
@@ -30,20 +34,28 @@ List all users that have a login shell so you can spot rogue accounts.
 getent passwd | grep -v nologin | grep -v /bin/false
 ```
 
+&nbsp;
+
 Check if any account besides root has UID 0.
 ```
 getent passwd | awk -F: '$3 == 0 {print}'
 ```
+
+&nbsp;
 
 See all listening ports and which process owns each one.
 ```
 ss -tlnp
 ```
 
+&nbsp;
+
 List every running service on the box.
 ```
 systemctl list-units --type=service --state=running
 ```
+
+&nbsp;
 
 Check the current firewall rules.
 ```
@@ -59,21 +71,29 @@ Check if any user has NOPASSWD sudo access, a common red team move.
 grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null
 ```
 
+&nbsp;
+
 List all systemd timers to find anything that shouldn't be there.
 ```
 systemctl list-timers --all
 ```
+
+&nbsp;
 
 Search bashrc files for common backdoor patterns like reverse shells or user creation.
 ```
 grep -n "useradd\|curl\|wget\|nc \|ncat\|bash -i\|/dev/tcp" /root/.bashrc /home/*/.bashrc 2>/dev/null
 ```
 
+&nbsp;
+
 Find any authorized_keys files on the system, including hidden ones.
 ```bash
 find / -name authorized_keys 2>/dev/null
 cat /etc/ssh/.ssh/authorized_keys 2>/dev/null
 ```
+
+&nbsp;
 
 Loop through every user and print any crontab entries they have.
 ```bash
@@ -83,10 +103,14 @@ for u in $(cut -d: -f1 /etc/passwd); do
 done
 ```
 
+&nbsp;
+
 Find any service files modified in the last 2 hours.
 ```
 find /etc/systemd/system -name "*.service" -mmin -120 2>/dev/null
 ```
+
+&nbsp;
 
 List processes not running as expected system users to find rogue ones.
 ```
@@ -102,10 +126,14 @@ Delete a rogue user and their home directory.
 userdel -r svc_health
 ```
 
+&nbsp;
+
 Remove their NOPASSWD sudoers file.
 ```
 rm /etc/sudoers.d/svc_health
 ```
+
+&nbsp;
 
 Stop, disable, and delete a malicious systemd timer and its service, then reload.
 ```bash
@@ -118,11 +146,15 @@ rm /etc/systemd/system/health-check.service
 systemctl daemon-reload
 ```
 
+&nbsp;
+
 Read the bashrc first to see the backdoor lines, then edit them out.
 ```bash
 cat /root/.bashrc
 nano /root/.bashrc
 ```
+
+&nbsp;
 
 Remove a hidden SSH key directory red team created.
 ```
@@ -144,6 +176,8 @@ ufw allow 9000/tcp
 ufw enable
 ```
 
+&nbsp;
+
 Fix SSH cert auth so only certificates with the correct principal can log in as each user.
 ```bash
 sed -i 's|AuthorizedPrincipalsFile none|AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u|' /etc/ssh/sshd_config
@@ -152,10 +186,14 @@ echo "username" > /etc/ssh/auth_principals/username
 systemctl restart sshd
 ```
 
+&nbsp;
+
 Check that PHP dangerous functions are disabled inside the Docker container.
 ```
 docker exec <container> php -i | grep disable_functions
 ```
+
+&nbsp;
 
 Rotate the root password.
 ```
@@ -171,15 +209,21 @@ Check auth.log for accepted and failed logins, filtering out the scoring engine.
 grep -E "Accepted|Failed" /var/log/auth.log | grep -v "10.100.111.2" | tail -20
 ```
 
+&nbsp;
+
 Check if the Wazuh agent is running.
 ```
 systemctl status wazuh-agent
 ```
 
+&nbsp;
+
 Start a tmux session so SSH disconnects don't kill your work.
 ```
 tmux new -s work
 ```
+
+&nbsp;
 
 Reattach to your tmux session after a disconnect.
 ```
@@ -195,15 +239,21 @@ List running containers.
 docker ps
 ```
 
+&nbsp;
+
 Get a shell inside a container.
 ```
 docker exec -it <container> /bin/bash
 ```
 
+&nbsp;
+
 Check container logs.
 ```
 docker logs <container>
 ```
+
+&nbsp;
 
 Restart a container.
 ```
